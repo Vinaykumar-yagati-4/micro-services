@@ -1,36 +1,320 @@
 services:
 
+  # =====================================================
+  # EUREKA SERVER
+  # =====================================================
+  eureka-service:
+    build:
+      context: ./eureka-service
+      dockerfile: Dockerfile
+    container_name: eureka-service
+    ports:
+      - "8761:8761"
+    environment:
+      SERVER_PORT: 8761
+      SPRING_APPLICATION_NAME: eureka-service
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
+      EUREKA_CLIENT_FETCH_REGISTRY: "false"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-service:8761/eureka/
+      EUREKA_INSTANCE_HOSTNAME: eureka-service
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+
+  # =====================================================
+  # AUTH DATABASE
+  # =====================================================
+  auth-mysql:
+    image: mysql:8.4
+    container_name: auth-mysql
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: "Vinay@444"
+      MYSQL_DATABASE: auth_db
+    volumes:
+      - auth_mysql_data:/var/lib/mysql
+    networks:
+      - microservices-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+
+  # =====================================================
+  # USER DATABASE
+  # =====================================================
+  user-mysql:
+    image: mysql:8.4
+    container_name: user-mysql
+    ports:
+      - "3308:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: "Vinay@444"
+      MYSQL_DATABASE: user_db
+    volumes:
+      - user_mysql_data:/var/lib/mysql
+    networks:
+      - microservices-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+
+  # =====================================================
+  # RABBITMQ
+  # =====================================================
   rabbitmq:
     image: rabbitmq:3-management
     container_name: secure-rabbitmq
-
     ports:
       - "5672:5672"
       - "15672:15672"
-
     environment:
       RABBITMQ_DEFAULT_USER: admin
       RABBITMQ_DEFAULT_PASS: admin
-
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
-
+    networks:
+      - microservices-network
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     restart: unless-stopped
 
+
+  # =====================================================
+  # REDIS
+  # =====================================================
   redis:
     image: redis:7-alpine
     container_name: secure-redis
-
     ports:
       - "6379:6379"
-
     command: redis-server --appendonly yes
-
     volumes:
       - redis_data:/data
-
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
+
+  # =====================================================
+  # USER SERVICE
+  # =====================================================
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    ports:
+      - "8082:8082"
+    environment:
+      SERVER_PORT: 8082
+      SPRING_APPLICATION_NAME: user-service
+
+      SPRING_DATASOURCE_URL: jdbc:mysql://user-mysql:3306/user_db?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: "Vinay@444"
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_CACHE_TYPE: redis
+      SPRING_CACHE_REDIS_TIME_TO_LIVE: 600000
+
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "true"
+      EUREKA_CLIENT_FETCH_REGISTRY: "true"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-service:8761/eureka/
+
+      EUREKA_INSTANCE_HOSTNAME: user-service
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      EUREKA_INSTANCE_INSTANCE_ID: user-service:8082
+
+    depends_on:
+      user-mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+
+  # =====================================================
+  # AUTH SERVICE
+  # =====================================================
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      SERVER_PORT: 8081
+      SPRING_APPLICATION_NAME: auth-service
+
+      SPRING_DATASOURCE_URL: jdbc:mysql://auth-mysql:3306/auth_db?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: "Vinay@444"
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: admin
+      SPRING_RABBITMQ_PASSWORD: admin
+
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "true"
+      EUREKA_CLIENT_FETCH_REGISTRY: "true"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-service:8761/eureka/
+
+      EUREKA_INSTANCE_HOSTNAME: auth-service
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      EUREKA_INSTANCE_INSTANCE_ID: auth-service:8081
+
+      JWT_SECRET: bXktdmVyeS1zdHJvbmctand0LXNlY3JldC1rZXktZm9yLWF1dGgtc2VydmljZS0yMDI2
+      JWT_ACCESS_TOKEN_EXPIRATION: 900000
+      JWT_REFRESH_TOKEN_EXPIRATION: 604800000
+
+    depends_on:
+      auth-mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+      user-service:
+        condition: service_started
+
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+
+  # =====================================================
+  # NOTIFICATION SERVICE
+  # =====================================================
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    ports:
+      - "8083:8083"
+    environment:
+      SERVER_PORT: 8083
+      SPRING_APPLICATION_NAME: notification-service
+
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: admin
+      SPRING_RABBITMQ_PASSWORD: admin
+
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "true"
+      EUREKA_CLIENT_FETCH_REGISTRY: "true"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-service:8761/eureka/
+
+      EUREKA_INSTANCE_HOSTNAME: notification-service
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      EUREKA_INSTANCE_INSTANCE_ID: notification-service:8083
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      eureka-service:
+        condition: service_started
+
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+
+  # =====================================================
+  # API GATEWAY
+  # =====================================================
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_PORT: 8080
+      SPRING_APPLICATION_NAME: api-gateway
+
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "true"
+      EUREKA_CLIENT_FETCH_REGISTRY: "true"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-service:8761/eureka/
+
+      EUREKA_INSTANCE_HOSTNAME: api-gateway
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      EUREKA_INSTANCE_INSTANCE_ID: api-gateway:8080
+
+      JWT_SECRET: bXktdmVyeS1zdHJvbmctand0LXNlY3JldC1rZXktZm9yLWF1dGgtc2VydmljZS0yMDI2
+
+    depends_on:
+      eureka-service:
+        condition: service_started
+      auth-service:
+        condition: service_started
+      user-service:
+        condition: service_started
+
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+
+# =====================================================
+# NETWORK
+# =====================================================
+networks:
+  microservices-network:
+    driver: bridge
+
+
+# =====================================================
+# VOLUMES
+# =====================================================
 volumes:
+  auth_mysql_data:
+  user_mysql_data:
   rabbitmq_data:
   redis_data:

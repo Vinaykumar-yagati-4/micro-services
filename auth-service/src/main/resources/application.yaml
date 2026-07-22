@@ -1,15 +1,12 @@
+server:
+  port: 8081
+
 spring:
   application:
     name: auth-service
 
-  rabbitmq:
-    host: localhost
-    port: 5672
-    username: admin
-    password: admin
-
   datasource:
-    url: jdbc:mysql://localhost:3306/auth_db
+    url: jdbc:mysql://auth-mysql:3306/auth_db
     username: root
     password: Vinay@444
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -17,28 +14,28 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-
     show-sql: true
-
     properties:
       hibernate:
         format_sql: true
 
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: admin
+    password: admin
+
 eureka:
   instance:
-    hostname: localhost
-    prefer-ip-address: true
-    ip-address: 127.0.0.1
+    hostname: auth-service
+    EUREKA_INSTANCE_PREFER_IP_ADDRESS: "false"
     instance-id: ${spring.application.name}:${server.port}
 
   client:
     register-with-eureka: true
     fetch-registry: true
     service-url:
-      defaultZone: http://localhost:8761/eureka/
-
-server:
-  port: 8081
+      defaultZone: http://eureka-service:8761/eureka/
 
 jwt:
   secret: bXktdmVyeS1zdHJvbmctand0LXNlY3JldC1rZXktZm9yLWF1dGgtc2VydmljZS0yMDI2

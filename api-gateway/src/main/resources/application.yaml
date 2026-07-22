@@ -20,21 +20,20 @@ spring:
               predicates:
                 - Path=/api/auth/**
 
+server:
+  port: 8080
+
 eureka:
   instance:
-    hostname: localhost
-    prefer-ip-address: true
-    ip-address: 127.0.0.1
+    hostname: api-gateway
+    EUREKA_INSTANCE_PREFER_IP_ADDRESS: "false"
     instance-id: ${spring.application.name}:${server.port}
 
   client:
     register-with-eureka: true
     fetch-registry: true
     service-url:
-      defaultZone: http://localhost:8761/eureka/
-
-server:
-  port: 8080
+      defaultZone: http://eureka-service:8761/eureka/
 
 jwt:
   secret: ${JWT_SECRET:bXktdmVyeS1zdHJvbmctand0LXNlY3JldC1rZXktZm9yLWF1dGgtc2VydmljZS0yMDI2}

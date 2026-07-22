@@ -1,5 +1,6 @@
 package com.maven.spring.userservice.controller;
 
+import com.maven.spring.userservice.dto.request.UserProfileRequestDto;
 import com.maven.spring.userservice.dto.response.ProfileResponseDto;
 import com.maven.spring.userservice.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,16 @@ public class UserController {
     public String hello() {
 
         return "Hello World!";
+    }
+
+    @PostMapping("/internal")
+    public ResponseEntity<String> createUserProfile(
+            @RequestBody UserProfileRequestDto request
+    ) {
+
+        userService.createUserProfile(request);
+
+        return ResponseEntity.ok("Profile Created");
     }
 
     @GetMapping("/profile")

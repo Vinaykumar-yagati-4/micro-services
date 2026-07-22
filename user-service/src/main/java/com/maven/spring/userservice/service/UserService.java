@@ -1,11 +1,15 @@
 package com.maven.spring.userservice.service;
 
+import org.springframework.cache.annotation.Cacheable;
+import com.maven.spring.userservice.dto.request.UserProfileRequestDto;
 import com.maven.spring.userservice.dto.response.ProfileResponseDto;
 import com.maven.spring.userservice.entity.UserEntity;
+import com.maven.spring.userservice.entity.Role;
 import com.maven.spring.userservice.exception.UserNotFoundException;
 import com.maven.spring.userservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
 
 @Service
 @RequiredArgsConstructor
@@ -13,7 +17,18 @@ public class UserService {
 
     private final UserRepository userRepository;
 
+
+
+    @Cacheable(
+            value = "userProfiles",
+            key = "#authUserId"
+    )
     public ProfileResponseDto getProfile(Long authUserId) {
+
+        System.out.println(
+                "Fetching profile from MySQL for authUserId: "
+                        + authUserId
+        );
 
         UserEntity user = userRepository
                 .findByAuthUserId(authUserId)
@@ -25,6 +40,25 @@ public class UserService {
                 );
 
         return convertToProfileResponse(user);
+    }
+
+    public void createUserProfile(UserProfileRequestDto request) {
+
+        if (userRepository.existsByAuthUserId(request.getAuthUserId())) {
+            return;
+        }
+
+        UserEntity user = UserEntity.builder()
+                .authUserId(request.getAuthUserId())
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .email(request.getEmail())
+                .role(Role.valueOf(request.getRole()))
+                .emailVerified(false)
+                .accountEnabled(true)
+                .build();
+
+        userRepository.save(user);
     }
 
     private ProfileResponseDto convertToProfileResponse(

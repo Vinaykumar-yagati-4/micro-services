@@ -158,7 +158,8 @@ public class JwtAuthenticationFilter
 
         return path.equals("/api/auth/signup")
                 || path.equals("/api/auth/login")
-                || path.equals("/api/auth/refresh");
+                || path.equals("/api/auth/refresh")
+                || path.equals("/api/users/internal");
     }
 
     /*

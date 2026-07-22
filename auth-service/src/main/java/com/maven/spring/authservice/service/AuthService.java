@@ -2,8 +2,12 @@ package com.maven.spring.authservice.service;
 
 import com.maven.spring.authservice.dto.request.LoginRequestDto;
 import com.maven.spring.authservice.dto.response.LoginResponseDto;
+import com.maven.spring.authservice.dto.NotificationMessage;
+import com.maven.spring.authservice.producer.NotificationProducer;
 import com.maven.spring.authservice.dto.request.RefreshTokenRequestDto;
 import com.maven.spring.authservice.dto.response.RefreshTokenResponseDto;
+import com.maven.spring.authservice.client.UserClient;
+import com.maven.spring.authservice.dto.request.UserProfileRequestDto;
 import com.maven.spring.authservice.dto.request.SignupRequestDto;
 import com.maven.spring.authservice.entity.Role;
 import com.maven.spring.authservice.entity.UserEntity;
@@ -21,6 +25,10 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
 
     private final JwtService jwtService;
+
+    private final UserClient userClient;
+
+    private final NotificationProducer notificationProducer;
 
     // ---------------- SIGNUP ----------------
 
@@ -51,7 +59,27 @@ public class AuthService {
                 .accountEnabled(true)
                 .build();
 
-        userRepository.save(user);
+        UserEntity savedUser = userRepository.save(user);
+
+        UserProfileRequestDto profileRequest =
+                UserProfileRequestDto.builder()
+                        .authUserId(savedUser.getId())
+                        .firstName(savedUser.getFirstName())
+                        .lastName(savedUser.getLastName())
+                        .email(savedUser.getEmail())
+                        .role(savedUser.getRole().name())
+                        .build();
+
+        userClient.createUserProfile(profileRequest);
+
+        NotificationMessage message =
+                NotificationMessage.builder()
+                        .firstName(savedUser.getFirstName())
+                        .lastName(savedUser.getLastName())
+                        .email(savedUser.getEmail())
+                        .build();
+
+        notificationProducer.send(message);
 
         return "User registered successfully";
     }

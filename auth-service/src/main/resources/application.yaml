@@ -2,6 +2,12 @@ spring:
   application:
     name: auth-service
 
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: admin
+    password: admin
+
   datasource:
     url: jdbc:mysql://localhost:3306/auth_db
     username: root
@@ -21,16 +27,19 @@ spring:
 eureka:
   instance:
     hostname: localhost
+    prefer-ip-address: true
+    ip-address: 127.0.0.1
+    instance-id: ${spring.application.name}:${server.port}
 
   client:
     register-with-eureka: true
     fetch-registry: true
-
     service-url:
       defaultZone: http://localhost:8761/eureka/
 
 server:
   port: 8081
+
 jwt:
   secret: bXktdmVyeS1zdHJvbmctand0LXNlY3JldC1rZXktZm9yLWF1dGgtc2VydmljZS0yMDI2
   access-token-expiration: 900000
